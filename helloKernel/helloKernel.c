@@ -1,26 +1,24 @@
-#include <linux/>
-#include <linux/>
+#include <linux/module.h>
+#include <linux/init.h>
 
-int __init my_init (void) {
+static int __init my_init (void) {
 	
-	Printk("Hello Kernel!");
+	printk("Hello Kernel!\n");
 
 	return 0;
 }
 
-int __exit my_exit(void) 
+static void __exit my_exit(void) { 
 	
-	Printk("Goodbey Kernel");
-
-	return 0;
+	printk("Goodbey Kernel\n");
 }
 
 
-my_init();
-my_exit();
+module_init(my_init);
+module_exit(my_exit);
 
 // Metadata
 
-kernel_License("GPT")
-KERNEL_AUTHOR("Moafk AstraSpecs")
-kERNEK_DESCRIPTION("Linux Kernel Module.")
+MODULE_LICENSE("GPT");
+MODULE_AUTHOR("Moafk AstraSpecs");
+MODULE_DESCRIPTION("Linux Kernel Mod:ule.");

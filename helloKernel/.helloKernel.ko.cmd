@@ -1,0 +1,1 @@
+savedcmd_/home/moafk/LDD/helloKernel/helloKernel.ko := ld -r -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T arch/arm64/module.lds -o /home/moafk/LDD/helloKernel/helloKernel.ko /home/moafk/LDD/helloKernel/helloKernel.o /home/moafk/LDD/helloKernel/helloKernel.mod.o;  true
