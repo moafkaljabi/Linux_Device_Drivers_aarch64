@@ -1,2 +1,1 @@
-### 
-Linux Device Drivers for arm architecture.
+### Linux Device Drivers for arm architecture.
