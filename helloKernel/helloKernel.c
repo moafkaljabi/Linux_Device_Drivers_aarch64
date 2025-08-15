@@ -20,5 +20,5 @@ module_exit(my_exit);
 // Metadata
 
 MODULE_LICENSE("GPT");
-MODULE_AUTHOR("Moafk AstraSpecs");
-MODULE_DESCRIPTION("Linux Kernel Mod:ule.");
+MODULE_AUTHOR("MA");
+MODULE_DESCRIPTION("Linux Kernel Module");
