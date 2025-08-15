@@ -1,0 +1,144 @@
+Notes 
+
+Big picture (what this driver actually does)
+
+Binding: The Device Tree overlay creates an SPI device node with compatible = "digilent,pmod-als". The kernel matches that to your driver via .of_match_table and calls your probe().
+
+Setup: In probe() you configure SPI (mode 3, 8 bits, 4 MHz), then register a misc device, which gives you /dev/pmod_als.
+
+I/O: When userspace does cat /dev/pmod_als, the kernel calls your .read(); you perform a single SPI transfer, parse the ADC bits, and return a number.
+
+
+
+
+
+
+
+
+
+spi.h: SPI core (structs, spi_sync, spi_setup, etc.).
+
+miscdevice.h: the misc device helper (easier than hand-rolling a cdev).
+
+uaccess.h: safe copy to/from user space (copy_to_user, etc.).
+
+u8, u16 vs uint8_t, uint16_t
+
+In kernel code, prefer u8, u16, u32, … from <linux/types.h>.
+
+Don’t use stdint.h—the kernel doesn’t use libc headers and has its own type system & style.
+
+So yes, u8 ≈ uint8_t, but use u8 in kernel drivers.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Error codes like -ENOMEM, -EIO, …
+
+In the kernel, functions return negative errno on failure.
+
+-ENOMEM: could not allocate memory.
+
+-EIO: I/O error (e.g., SPI transaction failed).
+
+-EINVAL: invalid parameter/state.
+
+-EFAULT: bad user-space pointer in copy.
+
+This is standard; user space sees these as errno val
+
+
+
+
+
+
+
+
+
+
+--              Format of data coming back from board is:
+--                      MSB                          LSB
+--      Index   7  6  5  4  3  2  1  0  |  7  6  5  4  3  2  1  0  |
+--      Data    0  0  0  D7 D6 D5 D4 D3    D2 D1 D0 0  0  0  0  Z
+
+
+
+
+
+
+
+
+
+The .read() path (SPI transfer, parsing, and EOF)
+
+Key pieces:
+
+if (*ppos > 0) return 0;  // EOF after first read
+
+
+ppos is the file position (like an offset).
+
+Devices usually aren’t files; to make cat exit, we simulate EOF by returning data once and then returning 0 on subsequent reads (unless the file is reopened). That’s why we set:
+
+*ppos = len;
+
+
+…so the next read sees ppos > 0 and gets 0 (EOF). If you want “streaming”, you’d handle this differently.
+
+
+
+
+
+
+
+
+SPI message
+u8 rx[2] = {0};
+struct spi_transfer t = {
+    .tx_buf = NULL,
+    .rx_buf = rx,
+    .len    = 2,
+    .speed_hz = PMOD_ALS_SPI_MAX_SPEED,
+    .bits_per_word = PMOD_ALS_SPI_BITS,
+};
+struct spi_message m;
+spi_message_init(&m);
+spi_message_add_tail(&t, &m);
+spi_sync(als->spi, &m);
+
+
+We schedule one full-duplex transfer of 2 bytes, clocking data from the ADC into rx.
+
+Some SPI controllers require a dummy TX buffer to clock the bus; Raspberry Pi’s controller is fine with tx=NULL for an RX-only transfer and will send zeros. (If you ever hit a controller that doesn’t, just supply a zeroed tx[2].)
+
+
+
+
+
+
+
+
+
+
+
+A few quality-of-life notes & optional improvements
+
+Concurrency: Right now .read() has no lock. If multiple readers open the device simultaneously, SPI core serializes at the controller level, but it’s still good practice to add a mutex if you later add shared buffers or state.
+
+Logging: In .read() you used pr_err(...). You can log with device context using dev_err(&als->spi->dev, ...) since you have als.
+
+Permissions: /dev/pmod_als may be root-only. Add a udev rule or set als->miscdev.mode = 0664; before misc_register() to control perms.
+
+Sysfs: If you’d rather expose readings via /sys/bus/spi/devices/.../raw, you can drop miscdevice and create sysfs attributes instead. Both are valid styles; miscdev is very convenient for “cat a number”.
+
+Continuous sampling: If you want streaming, add .poll, a blocking .read, or an IOCTL to control rate. For demo purposes, “each read does one conversion” is perfect.
