@@ -16,27 +16,31 @@
  * ADC uses SPI Mode 3;
  *
  * ALS sends two bytes: 
- * First Byte: 
- *
- * Second Byte:
- *
+ * --              Format of data coming back from board is:
+ * --                      MSB                          LSB
+ * --      Index   7  6  5  4  3  2  1  0  |  7  6  5  4  3  2  1  0  |
+ * --      Data    0  0  0  D7 D6 D5 D4 D3    D2 D1 D0 0  0  0  0  Z
+
  *
  * */
-#include <linux/types.h>
+
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/spi/spi.h>
+#include <linux/device.h>
+#include <linux/mutex.h>
+#include <linux/poll.h>
+#include <linux/kfifo.h>
+#include <linux/slab.h>
 
 
-#define PMOD_ALS_SPI_MODE 			SPI_MODE_3   /*CPOL: 1 and CPHA: 1*/
-#define PMOD_ALS_SPI_BITS 			8  
-#define PMOD_ALS_SPI_MAX_CLK		3200000	 	 /* 3.2 MHz, from ADC datasheet */ 
-
+#define DRIVER_NAME 	"pmod_als"
+#define MAX_BUF_LEN		16
+#define FIFO_SIZE 		64 // How many samples are we storing.
 
 /*
 
@@ -48,6 +52,8 @@
 struct pmod_als_dev {
 	struct spi_device *spi;
 	struct miscdevice misc_device;
+	struct kfifo fifo;
+	struct mutex lock;
 };
 
 
@@ -70,33 +76,41 @@ static ssize_t pmod_als_read(struct file *file,
 							size_t count,
 							loff_t *file_pos_ptr)
 {
-	struct pmod_als_dev *als_device = container_of(file -> private_data,
-													  struct pmod_als_dev,
-													  misc_device);
+	struct pmod_als_dev *als_device = file->private_data
 
-			u8 rx[2] = {0};
-			struct spi_transfer spi_t = {
-				.tx_buf = NULL,
-				.rx_buf = rx,
-				.len = 2,
-				.speed_hz = PMOD_ALS_SPI_MAX_CLK,
-				.bits_per_word = PMOD_ALS_SPI_BITS,
-			};
 
-			/*
-			- Create empty message
-			- Check EOF for the read
-			*/
-			struct spi_message spi_msg;
-			u16 raw_value; 
-			u8 parsed_value;
-			char data_str[8];
-			int len;
+		unsigned char rx[2];
+		u16 raw_value;
+		u8 value;
+		char data_str[MAX_BUF_LEN];
+		int len;
+		
+		if(kfifo_is_empty(&als_device->fifo))
+		{
+			return 0;
+		}
 
-			if(*file_pos_ptr > 0)
-			{
-				return 0;
-			}
+
+		struct spi_transfer spi_t = {
+			.tx_buf = NULL,
+			.rx_buf = rx,
+			.len = 2,
+			.speed_hz = PMOD_ALS_SPI_MAX_CLK,
+			.bits_per_word = PMOD_ALS_SPI_BITS,
+		};
+		/*
+		- Create empty message
+		- Check EOF for the read
+		*/
+		struct spi_message spi_msg;
+		u16 raw_value; 
+		u8 parsed_value;
+		char data_str[8];
+		int len;
+		if(*file_pos_ptr > 0)
+		{
+			return 0;
+		}
 
 
 	spi_message_init(&spi_msg);
