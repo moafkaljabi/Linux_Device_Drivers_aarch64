@@ -1,7 +1,6 @@
 obj-m += mpu_driver.o
 
 all:
-	modules 
-
+    make -C /lib/modules/$(uname -r)/build M=$(PWD) modules 
 clean: 
-	modules
+	make -C /lib/modules/$(uname -r)/build M=$(PWD) modules
