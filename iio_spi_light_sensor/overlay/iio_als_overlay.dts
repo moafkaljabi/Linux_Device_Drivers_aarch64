@@ -1,0 +1,22 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835";  
+
+    fragment@0 {
+        target = <&spi0>;  
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+
+            als@0 {
+                compatible = "digilent,iio-als";
+                reg = <0>;                      /* CS0 */
+                spi-max-frequency = <4000000>;  /* 4 MHz from datasheet */
+            };
+        };
+    };
+};
+

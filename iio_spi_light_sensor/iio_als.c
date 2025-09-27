@@ -15,7 +15,7 @@
 
 #define IIO_ALS_SPI_MODE      SPI_MODE_3
 #define IIO_ALS_SPI_BITS      8
-#define IIO_ALS_SPI_MAX_CLK   3200000   /* 3.2 MHz, per ADC datasheet */
+#define IIO_ALS_SPI_MAX_CLK   4000000   /* 4.0 MHz, per ADC datasheet */
 
 struct iio_als_data {
 	struct spi_device *spi;
